@@ -1,0 +1,1261 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>3-Stufen-Quiz (Führerschein-Style)</title>
+  <style>
+    :root{
+      --fs: 13px; /* alles Schriftgröße 13 */
+      --bg: #0b1020;
+      --card: #121a33;
+      --muted: #9fb0ff;
+      --text: #eef1ff;
+      --good: #39d98a;
+      --bad: #ff5c7a;
+      --accent: #7c9cff;
+      --border: rgba(255,255,255,.12);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      font-size: var(--fs);
+      background: radial-gradient(1200px 700px at 20% 10%, #17224d 0%, var(--bg) 60%);
+      color: var(--text);
+      padding: 18px;
+    }
+    .wrap{max-width: 980px; margin: 0 auto;}
+    h1{font-size: calc(var(--fs) * 1.6); margin: 0 0 10px;}
+    p{margin: 6px 0; color: rgba(238,241,255,.9)}
+    .grid{
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 14px;
+    }
+    @media (max-width: 860px){
+      .grid{grid-template-columns: 1fr;}
+    }
+    .card{
+      background: rgba(18,26,51,.92);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 14px 40px rgba(0,0,0,.35);
+    }
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    .btn{
+      font-size: var(--fs);
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      cursor:pointer;
+      user-select:none;
+    }
+    .btn:hover{background: rgba(255,255,255,.10)}
+    .btn.primary{
+      background: rgba(124,156,255,.22);
+      border-color: rgba(124,156,255,.5);
+    }
+    .btn.danger{
+      background: rgba(255,92,122,.18);
+      border-color: rgba(255,92,122,.45);
+    }
+    .btn:disabled{opacity:.65; cursor:not-allowed}
+    .pill{
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.05);
+      color: rgba(238,241,255,.95);
+      font-size: var(--fs);
+    }
+    .pill strong{color: var(--accent)}
+    .question{
+      font-size: calc(var(--fs) * 1.15);
+      line-height: 1.35;
+      margin: 10px 0 10px;
+    }
+    .answers{
+      display:grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    /* .answer wird jetzt als <label> genutzt */
+    .answer{
+      text-align:left;
+      width:100%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.05);
+      color: var(--text);
+      cursor:pointer;
+      font-size: var(--fs);
+    }
+    .answer:hover{background: rgba(255,255,255,.09)}
+    .answer.good{
+      border-color: rgba(57,217,138,.6);
+      background: rgba(57,217,138,.12);
+    }
+    .answer.bad{
+      border-color: rgba(255,92,122,.65);
+      background: rgba(255,92,122,.14);
+    }
+    .muted{color: rgba(238,241,255,.75)}
+    .divider{height:1px;background:var(--border); margin: 12px 0;}
+    .small{font-size: calc(var(--fs) * .95); color: rgba(238,241,255,.75)}
+    code{font-size: var(--fs); color: #d7ddff}
+    .kpi{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .kpi .box{
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(255,255,255,.04);
+    }
+    .box .n{font-size: calc(var(--fs) * 1.3); font-weight: 700}
+    .box .t{color: rgba(238,241,255,.78)}
+    .notice{
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px dashed rgba(124,156,255,.55);
+      background: rgba(124,156,255,.10);
+      color: rgba(238,241,255,.92);
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>3-Stufen-Quiz</h1>
+  <p class="muted">
+    Regeln: Richtig → Stufe 3→2→1. Falsch → 1→2, 2→3, 3 bleibt 3. Pro Modus kommen nur Fragen dieser Stufe.
+  </p>
+
+  <div class="grid">
+    <div class="card">
+      <div class="row">
+        <span class="pill">Aktiver Modus: <strong id="activeStageLabel">–</strong></span>
+        <span class="pill">Fragen in Modus: <strong id="poolCount">0</strong></span>
+        <span class="pill">Gesamt: <strong id="totalCount">0</strong></span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row">
+        <button class="btn primary" id="btnStage3">Stufe 3 üben</button>
+        <button class="btn primary" id="btnStage2">Stufe 2 üben</button>
+        <button class="btn primary" id="btnStage1">Stufe 1 üben</button>
+        <button class="btn" id="btnNext">Nächste Frage</button>
+      </div>
+
+      <div id="quizArea" style="margin-top:12px;">
+        <div class="notice">
+          Wähle oben eine Stufe (3/2/1), um zu starten.
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <strong>Status</strong>
+        <button class="btn danger" id="btnReset">Alles zurücksetzen</button>
+      </div>
+
+      <div class="kpi">
+        <div class="box">
+          <div class="n" id="countS3">0</div>
+          <div class="t">in Stufe 3</div>
+        </div>
+        <div class="box">
+          <div class="n" id="countS2">0</div>
+          <div class="t">in Stufe 2</div>
+        </div>
+        <div class="box">
+          <div class="n" id="countS1">0</div>
+          <div class="t">in Stufe 1</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="small">
+        <div><strong>Fragen bearbeiten:</strong> im Array <code>QUESTIONS</code> im Script.</div>
+        <div class="divider"></div>
+        <div><strong>Speicherung:</strong> automatisch im Browser (localStorage).</div>
+        <div class="divider"></div>
+        <div><strong>Tipp:</strong> Jede Frage braucht eine eindeutige <code>id</code>.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  /************************************************************
+   * 1) HIER EDITIERST DU DEINE FRAGEN
+   * - id muss eindeutig sein
+   * - correct ist ein Array der richtigen Indizes in "options"
+   ************************************************************/
+// Voll ausgeschriebenes QUESTIONS-Array (✅ = richtige Antwort(en))
+// Hinweis: Indizes beginnen bei 0 (erste Option = 0)
+
+
+
+
+
+
+
+
+
+
+// QUESTIONS-Array zum Einfügen in deine Quiz-App
+// Richtige Antworten als Index: a=0, b=1, c=2, d=3, e=4, f=5
+
+const QUESTIONS = [
+  {
+    id: "netzeffekte_01",
+    text: "1. Welche Aussagen zu Netzeffekten sind richtig?",
+    options: [
+      "Positive direkte Netzeffekte fangen erst ab einer kritischen Masse so richtig zum Greifen an.",
+      "Auf Grund von Netzeffekten kann sich eine schlechtere Technologie am Markt gegen eine technologisch überlegene durchsetzen.",
+      "Ist nicht ersichtlich, welches Produkt die kritische Masse erreichen wird, führt dies oft zu Abwarten bei den Käufern.",
+      "Bei indirekten Netzeffekten geht es um Komplementärleistungen."
+    ],
+    correct: [0, 1, 2, 3]
+  },
+  {
+    id: "preismodelle_hotel_02",
+    text: "2. Welche Preismodelle kommen beim Hotel „KommUndBleib“ zum Tragen?",
+    options: [
+      "Preisfestsetzung nach Nachfrage",
+      "Preisstrategien nach Marktsegmenten",
+      "Preisfestsetzung nach Kosten",
+      "Preisstrategien nach zeitlichen Kriterien"
+    ],
+    correct: [2, 3]
+  },
+  {
+    id: "standards_03",
+    text: "3. Welche Aussagen zu Standards sind richtig?",
+    options: [
+      "Durch Standards kann sich der Wert eines Netzes erhöhen.",
+      "Durch offene Standards können Lock-In-Effekte verringert werden.",
+      "Durch proprietäre Standards werden Lock-In-Effekte verringert.",
+      "Durch Standards wird oft erst die Teilnahme an einem Netz für eine große Anzahl von Benutzern ermöglicht."
+    ],
+    correct: [0, 1, 3]
+  },
+  {
+    id: "staehler_technologien_mehrwert_04",
+    text: "4. Nach Stähler (2002) schaffen (neue) Technologien direkten (Mehr-)Wert für Kunden, indem sie (neue) Produkte oder Dienstleistungen ermöglichen, die wiederum direkt zu einer Steigerung der Kundenzufriedenheit führen.",
+    options: [
+      "Wahr",
+      "Falsch"
+    ],
+    correct: [1]
+  },
+  {
+    id: "vernetzung_digitale_netzoekonomie_05",
+    text: "5. Welche Aussagen zu Vernetzung im Sinne der digitalen Netzökonomie sind richtig?",
+    options: [
+      "Durch die Vernetzung von Maschinen und Maschinen sowie von Mensch und Maschine entstehen Potentiale für neue Geschäftsmodelle. Durch die Vernetzung von Menschen ist dies nicht mehr gegeben.",
+      "Nur durch Lock-In-Effekte ist die Vernetzung erst möglich.",
+      "Offene Standards vereinfachen die Vernetzung.",
+      "Bei der Vernetzung von Mensch und Maschine ist besonders auf den Kontext zu achten."
+    ],
+    correct: [2, 3]
+  },
+  {
+    id: "unternehmenssteuerung_ebenen_06",
+    text: "6. Ordnen Sie die Merkmale der Unternehmenssteuerungsebenen korrekt zu (strategisch vs. operativ).",
+    options: [
+      "Eher langfristig → strategisch",
+      "Planend, entscheidend → strategisch",
+      "Effizienz → operativ",
+      "Wirkt im System → operativ",
+      "Erfolgs-/Ressourcenpotenziale → strategisch",
+      "Kurzfristig → operativ",
+      "Ausführend → operativ",
+      "Nutzung von Potenzialen → operativ",
+      "Erfolg/Liquidität → operativ",
+      "Aufbau und Erhalt von Potenzialen → strategisch",
+      "Wirkt auf das System → strategisch",
+      "Effektivität → strategisch"
+    ],
+    correct: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+  },
+  {
+    id: "erloesarten_collabsoft_07",
+    text: "7. Welche Erlösarten kommen im Geschäftsmodell von „CollabSoft“ zum Tragen?",
+    options: [
+      "Direkt, nutzungsabhängig",
+      "Direkt, nutzungsunabhängig",
+      "Indirekt, über Staat",
+      "Indirekt, nach Marktsegmenten",
+      "Direkt, nach Nachfrage",
+      "Indirekt, über Unternehmungen"
+    ],
+    correct: [0, 1, 5]
+  },
+  {
+    id: "partnerarten_geschaeftsmodell_08",
+    text: "8. Partnerarten im Geschäftsmodell – ordnen Sie korrekt zu",
+    options: [
+      "ERP-System auf Basis von Microsoft Windows → Komplementärleistungserbringer",
+      "Weinbauer mit Antipestiziden von zwei Firmen → Aktiver Partner",
+      "Österreichischer Autozulieferer für deutschen Autohersteller → Aktiver Partner",
+      "Online-Shop nutzt Services eines anderen Shops, Kunde kauft danach dort günstiger → Trittbrettfahrer"
+    ],
+    correct: [0, 1, 2, 3]
+  },
+  {
+    id: "digitalisierung_kosten_kunden_09",
+    text: "9. Durch Digitalisierung kann man einfacher eine hohe Anzahl an Kunden befriedigen, ohne dass die variablen Kosten spürbar steigen.",
+    options: [
+      "Wahr",
+      "Falsch"
+    ],
+    correct: [0]
+  },
+  {
+    id: "digitalisierung_aussagen_10",
+    text: "10. Welche Aussagen zur Digitalisierung sind richtig?",
+    options: [
+      "Digitalisierung ist die elektronische Transformation analoger Daten in computerlesbare digitale Form.",
+      "Ein Vorteil liegt in der höheren Übertragungsgeschwindigkeit als bei der analogen Form.",
+      "Ein Vorteil liegt in der höheren Übertragungskapazität als bei der analogen Form.",
+      "Durch die Digitalisierung wird das Internet durch Geld als Produktionsmittel geprägt."
+    ],
+    correct: [0, 1, 2]
+  },
+  {
+    id: "digitale_netzoekonomie_aussagen_11",
+    text: "11. Welche Aussagen zur digitalen Netzökonomie sind richtig?",
+    options: [
+      "Digitale Ökonomie beschreibt die globale Wissensökonomie mit kurzen Innovationszyklen und digitalen Informationen.",
+      "Digitale Netzökonomie beschreibt die mikroökonomischen Vorgänge beim Übergang zur Informationsgesellschaft.",
+      "Neue Ökonomie beschreibt die globale Wissensökonomie mit kurzen Innovationszyklen und digitalen Informationen.",
+      "Neue Ökonomie beschreibt die mikroökonomischen Vorgänge beim Übergang zur Informationsgesellschaft."
+    ],
+    correct: [0, 1]
+  },
+  {
+    id: "lock_in_freie_software_12",
+    text: "12. Als Unternehmer streben Sie durch den Einsatz von freier Software einen nachfrageseitigen Lock-In-Effekt an.",
+    options: [
+      "Wahr",
+      "Falsch"
+    ],
+    correct: [1]
+  },
+  {
+    id: "gilder_gesetz_13",
+    text: "13. Gilder-Gesetz:\n\nAktuelle Bandbreite = 100 Mbit/s\nWie hoch ist sie in 3 Jahren?",
+    options: [
+      "200 Mbit/s",
+      "400 Mbit/s",
+      "800 Mbit/s",
+      "1800 Mbit/s"
+    ],
+    correct: [2]
+  },
+  {
+    id: "geschaeftsmodell_veraenderbar_14",
+    text: "14. Ein Geschäftsmodell darf nach der Definition nicht verändert werden.",
+    options: [
+      "Wahr",
+      "Falsch"
+    ],
+    correct: [1]
+  },
+  {
+    id: "value_prop_effizienz_effektivitaet_15",
+    text: "15. Änderung der Value Proposition wirkt sich primär aus auf …",
+    options: [
+      "Effizienz eines Geschäftsmodells",
+      "Effektivität eines Geschäftsmodells"
+    ],
+    correct: [1]
+  },
+  {
+    id: "gassmann_staehler_zuordnung_16",
+    text: "16. Zuordnung nach Gassmann (2013) und Stähler (2002) – welche Zuordnungen sind korrekt?",
+    options: [
+      "Welchen Nutzen stiften wir? → Value Proposition",
+      "Für wen stiften wir Nutzen? → Value Proposition",
+      "Welche Produkte/Dienstleistungen bieten wir an? → Produkt-/Marktentwurf",
+      "Wie verdienen wir Geld? → Ertragsmodell",
+      "Welche Strategie verfolgen wir? → Geschäftsstrategie",
+      "Welches Kundenproblem lösen wir? → Value Proposition",
+      "Wie machen wir das? → Architektur der Leistungserstellung"
+    ],
+    correct: [0, 1, 3, 6]
+  },
+  {
+    id: "ebusiness_aussagen_17",
+    text: "17. Welche Aussagen zu E-Business sind richtig?",
+    options: [
+      "E-Procurement verbessert Kundenprozesse",
+      "E-Business gestaltet durch Internettechnologien das Geschäftsmodell neu.",
+      "E-Business und E-Commerce sind dasselbe.",
+      "E-Business umfasst Leistungsabsatz, Leistungserstellung und Beschaffung."
+    ],
+    correct: [1, 3]
+  },
+  {
+    id: "ertragsmodell_aussagen_18",
+    text: "18. Welche Aussagen zum Ertragsmodell sind richtig?",
+    options: [
+      "Ertragsmodell ist Teil des Erlösmodells.",
+      "Ertragsmodell bestimmt, wie Einnahmen generiert werden.",
+      "Ertragsmodell bildet Einnahmen aus Produkten/Dienstleistungen pro Periode ab.",
+      "Ertragsmodell bildet alle Einnahmen eines Unternehmens ab.",
+      "Sponsorbeiträge zählen zur Einkommensstruktur.",
+      "Ertragsmodell dient nicht der Kundengewinnung.",
+      "Ertragsmodell sichert kurzfristigen Erfolg."
+    ],
+    correct: [1, 2, 4, 5]
+  },
+  {
+    id: "value_proposition_aussagen_19",
+    text: "19. Welche Aussagen zur Value Proposition sind richtig?",
+    options: [
+      "Basis zur Identifikation von Lücken in Kundenbedürfnissen.",
+      "Charakterisiert Produkte und Dienstleistungen.",
+      "Definiert Herstellungs- bzw. Erbringungsprozess.",
+      "Wertschöpfungspartner beeinflussen sie indirekt.",
+      "Beschreibt den Kundennutzen des Geschäftsmodells."
+    ],
+    correct: [0, 1, 3, 4]
+  },
+  {
+    id: "vp_arch_preis_kostenstruktur_20",
+    text: "20. Value Proposition, Architektur der Leistungserstellung und Preismodell definieren die Kostenstruktur.",
+    options: [
+      "Wahr",
+      "Falsch"
+    ],
+    correct: [1]
+  },
+  {
+    id: "offene_standards_office_21",
+    text: "21. Warum gefährden offene Standards Microsoft Office nicht stark?",
+    options: [
+      "Direkte und indirekte Netzeffekte wirken.",
+      "Proprietärer Standard erzeugt Lock-In-Effekte.",
+      "Microsoft besitzt große Marktmacht.",
+      "Office ist einfach das beste Produkt."
+    ],
+    correct: [0, 1, 2]
+  },
+  {
+    id: "lock_in_ursachen_22",
+    text: "22. Welche Ursachen können Lock-In-Effekte haben?",
+    options: [
+      "Wissensbezogene Wechselbarrieren",
+      "Psychologische Wechselbarrieren",
+      "Technologische Wechselbarrieren",
+      "Kritische Massen",
+      "Standards",
+      "Marketingbezogene Wechselbarrieren"
+    ],
+    correct: [0, 1, 2, 3, 4, 5]
+  },
+  {
+    id: "digi_01_zusatzkosten",
+    text: "1. Aussage zur Digitalisierung und Zusatzkosten\n\nSelbst wenn bei der Erstellung sehr hohe Kosten anfallen, so liegt der Vorteil durch die Digitalisierung darin, dass mit sehr geringen Zusatzkosten weitere Kopien erstellt werden können. Dieser Vorteil greift sofort und ist unabhängig von der verkauften Menge.",
+    options: ["Wahr", "Falsch"],
+    correct: [1]
+  },
+  {
+    id: "gm_02_element_beschrieben",
+    text: "2. Welches Element des Geschäftsmodells wurde beschrieben?\n\nWir entwickeln Logistik-Software für große Warenhäuser. Diese Software wird in fünf verschiedenen Ausprägungen, jeweils sowohl als Stand-Alone-Lösung als auch auf Basis einer Cloud-basierten Architektur angeboten. Darüber hinaus bieten wir standardisierte SLAs an, die den Betrieb unserer Software sicherstellen.\n\nWelches Element des Geschäftsmodells wurde hier tatsächlich beschrieben?",
+    options: [
+      "Produkt-/Marktentwurf",
+      "Interne Architektur der Leistungserstellung",
+      "Value Proposition",
+      "Stufen der Wertschöpfung",
+      "Geschäftsstrategie"
+    ],
+    correct: [0]
+  },
+  {
+    id: "dno_03_aussagen",
+    text: "3. Welche Aussagen zur digitalen Netzökonomie sind richtig?",
+    options: [
+      "Offene Standards wirken sich negativ auf Netzeffekte aber positiv auf Lock-In-Effekte aus.",
+      "Je höher der Grad der Digitalisierung ist, desto stärker sind Lock-In-Effekte.",
+      "Die digitale Netzökonomie ist unter anderem geprägt durch Vernetzung, Digitalisierung, Globalisierung und Netzeffekte.",
+      "Netzeffekte erhöhen Lock-In-Effekte."
+    ],
+    correct: [2, 3]
+  },
+  {
+    id: "lockin_04_wissensbarrieren",
+    text: "4. Wissensbezogene Wechselbarrieren\n\nWissensbezogene Wechselbarrieren führen zu Wechselkosten, welche einen Lock-In-Effekt verursachen. Ein Beispiel dafür ist die Tatsache, dass Sie wissen, dass ein bestimmtes Produkt für Sie funktioniert und dass Sie diesem Produkt vertrauen, aber bei einem neuen Produkt dieses Wissen eben noch nicht haben.",
+    options: ["Wahr", "Falsch"],
+    correct: [1]
+  },
+  {
+    id: "vernetzung_05_auswirkungen",
+    text: "5. Welche Aussagen zu Auswirkungen der Vernetzung sind richtig?",
+    options: [
+      "Man muss Kunden keine Komplettlösungen anbieten.",
+      "Es ist unwichtig geworden, welche Partner ich habe.",
+      "Kooperationen entlang der Wertschöpfungskette werden wichtiger.",
+      "Man konzentriert sich heute mehr auf seine Kernkompetenzen."
+    ],
+    correct: [2, 3]
+  },
+  {
+    id: "startup_06_wachstum_herausforderungen",
+    text: "6. Start-up mit starkem Wachstum – Herausforderungen für das Geschäftsmodell\n\nEin Start-up in Deutschland freut sich bereits innerhalb kürzester Zeit nach der Gründung über eine große Nachfrage und somit über ein gutes Wachstumspotenzial. Auch aus dem Ausland kommen schon die ersten Nachfragen. Welche Herausforderungen muss das Start-up im Bezug auf sein Geschäftsmodell meistern, um dem Wachstumspotenzial auch „gewachsen“ zu sein?",
+    options: [
+      "Starke Integration von Prozessen und IT-Systemen",
+      "Prüfung und Verbesserung der Skalierbarkeit",
+      "Abschätzung des künftigen Transaktionsvolumens"
+    ],
+    correct: [1, 2]
+  },
+  {
+    id: "staehler_07_architektur_elemente",
+    text: "7. Architektur der Leistungserstellung nach Stähler (2002)\n\nÜber welche Elemente ist die Architektur der Leistungserstellung eines Geschäftsmodells definiert?",
+    options: [
+      "Einkommensstruktur",
+      "IKT-Unterstützung",
+      "Produkt-/Marktentwurf",
+      "Stabilität der Architektur",
+      "Skalierbarkeit",
+      "Interne Architektur",
+      "Externe Architektur"
+    ],
+    correct: [2, 3, 5, 6]
+  },
+  {
+    id: "arch_08_extern_vs_intern",
+    text: "8. Externe Architektur der Leistungserstellung\n\nIm Gegensatz zur internen, berücksichtigt die externe Architektur der Leistungserstellung eines Geschäftsmodells auch notwendige Ressourcen zur Erbringung der Wertschöpfung.",
+    options: ["Wahr", "Falsch"],
+    correct: [1]
+  },
+  {
+    id: "standards_09_proprietaer",
+    text: "9. Aussagen zu proprietären Standards",
+    options: [
+      "MS Office hat erfolgreich einen proprietären Standard etabliert.",
+      "Bei Erfolg erhöhen proprietäre Standards die Wettbewerbsfähigkeit und Markteintrittsbarrieren.",
+      "Proprietäre Standards werden meist durch die Anwender weiterentwickelt.",
+      "Um sich durchzusetzen benötigt man bei proprietären Standards eine große Marktmacht (Monopolstellung)."
+    ],
+    correct: [0, 1, 3]
+  },
+  {
+    id: "netzeffekte_10_beispiele_zuordnung",
+    text: "10. Zuordnung von Beispielen zu Netzeffekten (welche Zuordnungen sind korrekt?)",
+    options: [
+      "Amazon: Andere Anbieter können über die Plattform ihre Produkte anbieten → große Produktpalette → Positiv indirekter Netzeffekt",
+      "Facebook: Viele User, Freunde sind dort → hohe Attraktivität → Positiv direkter Netzeffekt",
+      "Analoge Fotografie (Kodak): Kaum Komplementärlösungen → Negativ indirekter Netzeffekt",
+      "Skateboarden: Weniger Nutzer → weniger Austausch → Negativ direkter Netzeffekt"
+    ],
+    correct: [0, 1, 2, 3]
+  },
+  {
+    id: "netzeffekte_11_aussagen",
+    text: "11. Welche Aussagen zu Netzeffekten sind richtig?",
+    options: [
+      "Indirekte Netzeffekte beschreiben, dass der Wert des Netzes mit der Anzahl an Komplementärleistungen steigt.",
+      "Direkte Netzeffekte beschreiben, dass der Wert des Netzes mit der Anzahl an Usern steigt.",
+      "Die Anzahl an Usern im Netz ist bei indirekten Netzeffekten nicht von Bedeutung.",
+      "Direkte Netzeffekte beschreiben, dass der Wert des Netzes mit der Anzahl an Komplementärleistungen steigt."
+    ],
+    correct: [0, 1]
+  },
+  {
+    id: "partnerschaften_12_flexibilitaet",
+    text: "12. Partnerschaften und Flexibilität\n\nStabile, langfristige Partnerschaften schränken i. d. R. die Flexibilität ein, geben jedoch Sicherheit in Bezug auf Planung und Qualität. Kommt es zu einem Partnerwechsel, sind flexible Strukturen (Organisation, Prozesse, IT-Systeme etc.) zur Vermeidung von Produktionsausfällen wichtig und nützlich.",
+    options: ["Wahr", "Falsch"],
+    correct: [0]
+  },
+  {
+    id: "vp_13_konstanz",
+    text: "13. Konstanz der Value Proposition\n\nDie Value Proposition bildet den konstanten Kern eines Geschäftsmodells. Sie darf in keinem Fall verändert werden und jegliche übrigen Elemente eines Geschäftsmodells müssen so definiert sein, dass die Value Proposition sichergestellt wird.",
+    options: ["Wahr", "Falsch"],
+    correct: [1]
+  },
+  {
+    id: "digi_14_standards_globalisierung",
+    text: "14. Digitalisierung, Standards und Globalisierung\n\nDurch Digitalisierung und Standards wird die Globalisierung vorangetrieben. Eine mögliche Begründung ist die Tatsache, dass durch Digitalisierung und offene Standards erst das Internet entstehen konnte. Dies ermöglicht orts- und zeitunabhängige Kommunikation, Datentransfers und Geschäftstransaktionen.",
+    options: ["Wahr", "Falsch"],
+    correct: [0]
+  },
+  {
+    id: "arch_15_wertschoepfungsstufen",
+    text: "15. Wertschöpfungsstufen der internen Architektur der Leistungserstellung\n\nWelche Aussagen sind richtig?",
+    options: [
+      "Das Durchlaufen der Wertschöpfungsstufen dient der Festlegung der Produkte, Dienstleistungen und des Sortiments eines Unternehmens.",
+      "Die Wertschöpfungsstufen können durch ein Geschäftsprozessmodell repräsentiert werden.",
+      "Die Anzahl der involvierten Partner bestimmt die Anzahl der Wertschöpfungsstufen.",
+      "Die Erfüllung der Value Proposition steht im Mittelpunkt.",
+      "Akteure und Rollen sind wesentliche Elemente der Wertschöpfungsstufen.",
+      "Die Wertschöpfungsstufen definieren die Anordnung der Wertschöpfungselemente und umgekehrt.",
+      "Für eine vollständige Erbringung der Value Proposition ist es notwendig, immer alle Wertschöpfungsstufen zu durchlaufen."
+    ],
+    correct: [1, 3, 4, 5]
+  },
+
+
+
+
+
+  
+
+
+
+
+  //Fragen 2024
+  {
+    id: "scale_01_digitale_gm",
+    text: "1. Welche Aussagen treffen auf die Skalierbarkeit von digitalen Geschäftsmodellen zu?",
+    options: [
+      "„Best of breed“ (für jede Funktion das beste IT-System) trägt zur Skalierbarkeit bei",
+      "Starke Integration von Prozessen und IT-Systemen kann zu einem Hindernis werden",
+      "Starke Integration von Prozessen und IT-Systemen fördert die Flexibilität",
+      "Transaktionsvolumen bei innovativen digitalen Geschäftsmodellen oft schwer abschätzbar",
+      "IT-Systeme müssen flexibel und gleichzeitig wirtschaftlich gestaltet sein"
+    ],
+    correct: [1, 3, 4]
+  },
+  {
+    id: "vp_02_aussagen",
+    text: "2. Welche Aussagen zur Value Proposition eines Geschäftsmodells sind richtig?",
+    options: [
+      "Die Value Proposition beschreibt den Kundennutzen aus dem Geschäftsmodell.",
+      "Die Value Proposition ist die Basis für eine Lückenidentifikation in der Erfüllung der Kundenbedürfnisse.",
+      "Wertschöpfungspartner haben (indirekten) Einfluss auf die Value Proposition.",
+      "Die Value Proposition charakterisiert die Produkte und Dienstleistungen eines Unternehmens.",
+      "Die Value Proposition definiert, wie ein Produkt hergestellt bzw. eine Dienstleistung erbracht wird."
+    ],
+    correct: [0, 1, 2, 3]
+  },
+  {
+    id: "dno_03_information",
+    text: "3. Information in der digitalen Netzökonomie\n\nEines der wichtigsten Produktionsmittel in der digitalen Netzökonomie ist Information. Die digitale Netzökonomie ist geprägt durch die Quantität der Information. Die Qualität spielt keine Rolle.",
+    options: ["Wahr", "Falsch"],
+    correct: [1]
+  },
+  {
+    id: "dno_04_aussagen",
+    text: "4. Welche Aussagen zur digitalen Netzökonomie sind richtig?",
+    options: [
+      "Netzeffekte erhöhen Lock-In Effekte.",
+      "Offene Standards wirken sich negativ auf Netzeffekte aber positiv auf Lock-In Effekte aus.",
+      "Je höher der Grad der Digitalisierung ist, desto stärker sind Lock-In Effekte.",
+      "Die digitale Netzökonomie ist unter anderem geprägt durch Vernetzung, Digitalisierung, Globalisierung und Netzeffekte."
+    ],
+    correct: [0, 3]
+  },
+  {
+    id: "lockin_05_wirkungen",
+    text: "5. Welche Wirkungen können zu Lock-In Effekten führen?",
+    options: [
+      "Vernetzung",
+      "Vertrauen",
+      "Netzeffekte",
+      "Digitalisierung",
+      "Wechselkosten"
+    ],
+    correct: [1, 2, 4]
+  },
+  {
+    id: "operativ_strategisch_06",
+    text: "6. Welche Aussagen sind richtig? (operativ vs. strategisch)",
+    options: [
+      "Operatives Handeln bedeutet Potenziale zu nutzen.",
+      "Operatives Handeln bedeutet Potenziale (Ressourcen, Erfolg) aufzubauen und zu erhalten.",
+      "Strategisches Handeln bedeutet Potenziale zu nutzen.",
+      "Strategisches Handeln bedeutet Potenziale (Ressourcen, Erfolg) aufzubauen und zu erhalten."
+    ],
+    correct: [0, 3]
+  },
+  {
+    id: "gm_07_veraenderbarkeit",
+    text: "7. Veränderbarkeit des Geschäftsmodells\n\nDas Geschäftsmodell ist das Abbild eines Unternehmens. Nachdem es die überlebensnotwendige Basis ist, darf es – einmal definiert – nicht mehr verändert werden.",
+    options: ["Wahr", "Falsch"],
+    correct: [1]
+  },
+  {
+    id: "lockin_08_bankwechsel",
+    text: "8. Ursache eines Lock-In Effekts (Bankwechsel)\n\nSie nutzen ELBA, sind unzufrieden, wechseln aber nicht, da Sie Angst haben, dass die Umstellung zu viel Zeit benötigt.",
+    options: [
+      "Standards",
+      "technologisch",
+      "wissensbezogen",
+      "psychologisch",
+      "marketingbezogen",
+      "kritische Masse"
+    ],
+    correct: []
+  },
+  {
+    id: "vp_09_konstanz",
+    text: "9. Konstanz der Value Proposition\n\nDie Value Proposition bildet den konstanten Kern eines Geschäftsmodells und darf nicht verändert werden.",
+    options: ["Wahr", "Falsch"],
+    correct: [1]
+  },
+  {
+    id: "startup_10_herausforderungen",
+    text: "10. Start-up mit starkem Wachstum – Herausforderungen",
+    options: [
+      "Prüfung und Verbesserung der Skalierbarkeit",
+      "Abschätzung des künftigen Transaktionsvolumens",
+      "Starke Integration von Prozessen und IT-Systemen"
+    ],
+    correct: [0, 1]
+  },
+  {
+    id: "arthur_11_gesetz",
+    text: "11. Arthurs Gesetz\n\nDurch steigende Attraktivität eines Systems integrieren Kunden dieses stärker, die Wechselkosten steigen und indirekt wächst die Anzahl der angebotenen Komponenten.",
+    options: ["Wahr", "Falsch"],
+    correct: [0]
+  },
+  {
+    id: "lockin_12_aussagen",
+    text: "12. Welche Aussagen zu Lock-In Effekten sind richtig?",
+    options: [
+      "Der nachfrageseitige Lock-In Effekt entsteht durch Kundenbindungen.",
+      "Der nachfrageseitige Lock-In Effekt entsteht durch den Einsatz freier Software.",
+      "Lock-In Effekte können eine Innovationsbremse sein.",
+      "Die Überwindung von Lock-In Effekten zu Herstellern ist durch den Einsatz freier Software möglich."
+    ],
+    correct: [0, 2]
+  },
+  {
+    id: "strategie_gm_13",
+    text: "13. Welche Aussagen sind richtig? (Strategie & Geschäftsmodell)",
+    options: [
+      "GM-Entwicklung ist ein iterativer Prozess.",
+      "Geschäftsstrategie und Geschäftsmodell sind konvergent.",
+      "Strategisches Handeln zielt auf Effizienz, operatives auf Effektivität.",
+      "Geschäftsstrategie und Geschäftsmodell sind nicht konvergent."
+    ],
+    correct: [0, 3]
+  },
+  {
+    id: "standards_14_innovation",
+    text: "14. Standards und Innovation\n\nInnovationen werden durch Standards (vor allem durch monopolartige Wettbewerbsstellungen) gebremst.",
+    options: ["Wahr", "Falsch"],
+    correct: [1]
+  },
+  {
+    id: "staehler_15_technologien",
+    text: "15. Technologien nach Stähler (2002)\n\nNeue Technologien schaffen direkten Mehrwert für Kunden und führen direkt zu höherer Kundenzufriedenheit.",
+    options: ["Wahr", "Falsch"],
+    correct: [1]
+  },
+  {
+    id: "arch_16_ressourcen",
+    text: "16. Ressourcen der internen Architektur der Leistungserstellung",
+    options: [
+      "Strategische Vermögenswerte (Marken, Patente, Kundenbeziehungen)",
+      "Kernkompetenzen (Wissen)",
+      "Wettbewerbsvorteile",
+      "Definierte Geschäftsprozesse"
+    ],
+    correct: [0]
+  },
+  {
+    id: "ebusiness_17",
+    text: "17. Welche Aussagen zu E-Business sind richtig?",
+    options: [
+      "E-Procurement verbessert Kundenprozesse",
+      "E-Business beschäftigt sich mit Leistungsabsatz, Leistungserstellung und Beschaffung.",
+      "E-Business und E-Commerce sind dasselbe.",
+      "Beim E-Business wird durch Internettechnologien das Geschäftsmodell neu gestaltet."
+    ],
+    correct: [1, 3]
+  },
+  {
+    id: "globalisierung_18",
+    text: "18. Welche Aussagen zur Globalisierung sind richtig?",
+    options: [
+      "Globalisierung wurde durch Digitalisierung und Standards unterstützt.",
+      "Das Internet unterstützt die Globalisierung.",
+      "Globalisierung führt zu potenziell mehr Konkurrenten.",
+      "Globalisierung führt zu potenziell mehr Kunden."
+    ],
+    correct: [0, 1, 2, 3]
+  },
+  {
+    id: "gassmann_19_fragen",
+    text: "19. Welche Fragestellungen sollte ein Geschäftsmodell laut Gassmann et al. beantworten?",
+    options: [
+      "Warum?",
+      "Wann?",
+      "Was?",
+      "Wer?",
+      "Wie?",
+      "Wert?",
+      "Wo?"
+    ],
+    correct: [2, 3, 4, 5]
+  },
+  {
+    id: "vernetzung_20_kontext",
+    text: "20. Bei welcher Art der Vernetzung ist besonders auf den Kontext zu achten?",
+    options: [
+      "Maschine zu Maschine",
+      "Mensch zu Mensch",
+      "Maschine zu Mensch"
+    ],
+    correct: [2]
+  },
+  {
+    id: "standards_21",
+    text: "21. Welche Aussagen zu Standards sind richtig?",
+    options: [
+      "Durch Standards wird oft erst die Teilnahme an einem Netz für viele Benutzer ermöglicht.",
+      "Durch proprietäre Standards werden Lock-In Effekte verringert.",
+      "Durch offene Standards können Lock-In Effekte verringert werden.",
+      "Durch Standards kann sich der Wert eines Netzes erhöhen."
+    ],
+    correct: [0, 2, 3]
+  },
+  {
+    id: "scale_digital_01",
+    text: "1. Aussage zur Skalierbarkeit durch Digitalisierung\n\n„If you can serve one customer, you can serve a million.“ Die Digitalisierung ermöglicht genau dies, weil die fixen Kosten unabhängig von der verkauften Stückzahl sehr niedrig gehalten werden können.",
+    options: ["Wahr", "Falsch"],
+    correct: [1]
+  },
+  {
+    id: "new_media_02",
+    text: "2. Aussagen zu Neuen Medien\n\nNeue Medien können selbst agieren, sind räumlich und zeitlich unabhängig und simultan verfügbar. Neue Medien sind vernetzt und multimedial. Darüber hinaus können Menschen sowohl mit einem Medium, als auch durch das Medium kommunizieren.",
+    options: ["Wahr", "Falsch"],
+    correct: [0]
+  },
+  {
+    id: "oekonomie_03_zuordnung",
+    text: "3. Ordnen Sie die Definitionen dem richtigen Begriff zu",
+    options: [
+      "Zeit nach 1995 → starkes Wirtschaftswachstum bei gleichzeitig niedriger Inflation → Neue Ökonomie",
+      "Mikroökonomische Vorgänge beim Übergang von der Industrie- zur Informationsgesellschaft → Digitale Netzökonomie",
+      "Globale Wissensökonomie mit kurzen Innovationszyklen und digitalen Informationen → Digitale Ökonomie",
+      "Wandel der 1990er auf Basis des Leistungssprungs der IKT und digitaler Netze → Neue Ökonomie"
+    ],
+    correct: [0, 1, 2, 3]
+  },
+  {
+    id: "dno_04_zusammenhaenge",
+    text: "4. Aussagen zu Zusammenhängen der digitalen Netzökonomie",
+    options: [
+      "Offene Standards erhöhen Lock-In Effekte",
+      "Offene Standards verringern Lock-In Effekte",
+      "Offene Standards tragen zu Digitalisierung, Vernetzung und Globalisierung bei",
+      "Netzeffekte steigern Lock-In Effekte",
+      "Netzeffekte verringern Lock-In Effekte"
+    ],
+    correct: [1, 2, 3]
+  },
+  {
+    id: "partner_05_arten",
+    text: "5. Partnerarten im Geschäftsmodell (Zuordnung)",
+    options: [
+      "Südweststeirischer Weinbauer & Antipestizide-Anbieter → Aktiver Partner",
+      "ERP-System auf Basis von Microsoft Windows → Komplementärleistungserbringer",
+      "Autozulieferer für deutschen Autohersteller → Aktiver Partner",
+      "„DeineMode.net“ nutzt Services von „MeineMode.com“ → Trittbrettfahrer"
+    ],
+    correct: [0, 1, 2, 3]
+  },
+  {
+    id: "gm_06_definitionen",
+    text: "6. Welche Definitionen für ein Geschäftsmodell sind richtig?",
+    options: [
+      "Das Geschäftsmodell ist die DNA des Unternehmens und gibt Sinn für Mitarbeiter und Kunden.",
+      "Das Geschäftsmodell regelt Prozessverantwortlichkeiten sowie In- und Outputs.",
+      "A business model is a representation of how an organization makes (or intends to make) money.",
+      "Das Geschäftsmodell beschreibt detailliert die Features eines Produktes."
+    ],
+    correct: [0, 2]
+  },
+  {
+    id: "kritische_masse_07",
+    text: "7. Kritische Masse und Markt\n\nErreicht ein Konkurrent eine kritische Masse, beginnt häufig das „Winner takes it all“-Prinzip zu greifen.",
+    options: ["Wahr", "Falsch"],
+    correct: [0]
+  },
+  {
+    id: "partnerschaften_08",
+    text: "8. Langfristige Partnerschaften\n\nStabile, langfristige Partnerschaften schränken die Flexibilität ein, geben aber Planungssicherheit. Flexible Strukturen sind bei Partnerwechseln wichtig.",
+    options: ["Wahr", "Falsch"],
+    correct: [0]
+  },
+  {
+    id: "vp_canvas_09",
+    text: "9. Aspekte im Value Proposition Canvas",
+    options: [
+      "Products & Services",
+      "Customer Job(s)",
+      "Key Activities",
+      "Pains und Gains",
+      "Key Partners"
+    ],
+    correct: [0, 1]
+  },
+  {
+    id: "gilder_10",
+    text: "10. Gilder-Gesetz (Bandbreite)\n\nAusgang: 100 Mbit/s – wie hoch in 3 Jahren?",
+    options: [
+      "200 Mbit/s",
+      "400 Mbit/s",
+      "800 Mbit/s",
+      "900 Mbit/s"
+    ],
+    correct: [2]
+  },
+  {
+    id: "lockin_11_free_software",
+    text: "11. Nachfrageseitiger Lock-In durch freie Software\n\nAls Unternehmer streben Sie durch den Einsatz von freier Software einen nachfrageseitigen Lock-In Effekt an.",
+    options: ["Wahr", "Falsch"],
+    correct: [1]
+  },
+  {
+    id: "produkt_markt_12",
+    text: "12. Produkt-/Marktentwurf – welcher Aspekt trifft zu?",
+    options: [
+      "Festlegung der Produkteigenschaften als Basis für die Preisgestaltung",
+      "Definition von Produkten/Dienstleistungen als Basis für die Nutzengenerierung",
+      "Schnittstelle zwischen interner und externer Architektur",
+      "Abgrenzung von Märkten (Länder, Regionen, Zielgruppen)"
+    ],
+    correct: [1]
+  },
+  {
+    id: "preismodell_13",
+    text: "13. Aussagen zum Preismodell",
+    options: [
+      "Über das Preismodell werden die Erlösarten definiert",
+      "Es gibt direkte und indirekte Preisstrategien",
+      "Preisfestsetzung kann nach Nachfrage oder Kosten erfolgen",
+      "Das Preismodell ist ein Element des Ertragsmodells",
+      "Zielgruppen/Marktsegmente spielen keine Rolle"
+    ],
+    correct: [2]
+  },
+  {
+    id: "ertragsmodell_14",
+    text: "14. Aussagen zum Ertragsmodell",
+    options: [
+      "Das Ertragsmodell sichert kurzfristigen Erfolg",
+      "Das Ertragsmodell ist Teil des Erlösmodells",
+      "Das Ertragsmodell bildet alle Einnahmen eines Unternehmens ab",
+      "Das Ertragsmodell ist kein Mittel zur Kundengewinnung",
+      "Das Ertragsmodell bestimmt, wie Einnahmen generiert werden",
+      "Das Ertragsmodell bildet Einnahmen aus Produkten/Dienstleistungen pro Periode ab",
+      "Sponsorbeiträge zählen zur Einkommensstruktur und gehören ins Ertragsmodell"
+    ],
+    correct: [4, 5, 6]
+  },
+  {
+    id: "netzeffekte_15",
+    text: "15. Aussagen zu Netzeffekten",
+    options: [
+      "E-Mail ist ein Beispiel für indirekte Netzeffekte",
+      "Netzeffekte benötigen eine kritische Masse",
+      "Metcalfes Gesetz beschreibt indirekte Netzeffekte",
+      "Das Internet ist eines der besten Beispiele für direkte Netzeffekte"
+    ],
+    correct: [1, 3]
+  },
+  {
+    id: "ertragsmodell_16",
+    text: "16. Ertragsmodell (zweite Version)",
+    options: [
+      "Das Ertragsmodell sichert kurzfristigen Erfolg",
+      "Das Ertragsmodell ist Teil des Erlösmodells",
+      "Abbildung aller Einnahmen eines Unternehmens",
+      "Kein Mittel zur Kundengewinnung (dafür Preismodell)",
+      "Bestimmt, wie Einnahmen generiert werden",
+      "Abbildung der Einnahmen aus Produkten/Dienstleistungen pro Periode",
+      "Sponsorbeiträge zählen zur Einkommensstruktur"
+    ],
+    correct: [4, 5, 6]
+  }
+];
+
+
+
+
+
+
+
+
+
+
+
+  /************************************************************
+   * 2) LOGIK (3-Stufen-System)
+   ************************************************************/
+  const STORAGE_KEY = "three_stage_quiz_v2_multi";
+
+  /** stageById: { [id]: 1|2|3 } */
+  let stageById = {};
+  let activeStage = null; // 1|2|3
+  let currentQuestion = null; // { q, shuffledKeys }
+
+  const el = (id) => document.getElementById(id);
+
+  function loadState(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        stageById = JSON.parse(raw) || {};
+      }
+    }catch(e){
+      stageById = {};
+    }
+
+    // Initial: alles Stufe 3, wenn nicht vorhanden
+    for(const q of QUESTIONS){
+      if(!(q.id in stageById)) stageById[q.id] = 3;
+    }
+    saveState();
+  }
+
+  function saveState(){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stageById));
+  }
+
+  function resetAll(){
+    stageById = {};
+    for(const q of QUESTIONS) stageById[q.id] = 3;
+    saveState();
+    activeStage = null;
+    currentQuestion = null;
+    renderStatus();
+    renderIdle();
+  }
+
+  function countByStage(stage){
+    let c = 0;
+    for(const q of QUESTIONS){
+      if(stageById[q.id] === stage) c++;
+    }
+    return c;
+  }
+
+  function getPool(stage){
+    return QUESTIONS.filter(q => stageById[q.id] === stage);
+  }
+
+  function shuffleArray(arr){
+    const a = arr.slice();
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function pickRandomFrom(arr){
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  function renderStatus(){
+    el("countS3").textContent = countByStage(3);
+    el("countS2").textContent = countByStage(2);
+    el("countS1").textContent = countByStage(1);
+
+    el("totalCount").textContent = QUESTIONS.length;
+
+    if(activeStage === null){
+      el("activeStageLabel").textContent = "–";
+      el("poolCount").textContent = "0";
+    }else{
+      el("activeStageLabel").textContent = String(activeStage);
+      el("poolCount").textContent = String(getPool(activeStage).length);
+    }
+  }
+
+  function renderIdle(){
+    const qa = el("quizArea");
+    qa.innerHTML = `
+      <div class="notice">
+        Wähle oben eine Stufe (3/2/1), um zu starten.
+      </div>
+    `;
+  }
+
+  function renderEmptyPool(stage){
+    const qa = el("quizArea");
+    qa.innerHTML = `
+      <div class="notice">
+        In <strong>Stufe ${stage}</strong> sind aktuell <strong>keine</strong> Fragen.
+        <div style="margin-top:8px" class="small">
+          Tipp: Übe eine andere Stufe oder beantworte Fragen, damit welche in diese Stufe wandern.
+        </div>
+      </div>
+    `;
+  }
+
+  function startStage(stage){
+    activeStage = stage;
+    currentQuestion = null;
+    renderStatus();
+    nextQuestion();
+  }
+
+  function nextQuestion(){
+    if(activeStage === null){
+      renderIdle();
+      return;
+    }
+
+    const pool = getPool(activeStage);
+    renderStatus();
+
+    if(pool.length === 0){
+      renderEmptyPool(activeStage);
+      return;
+    }
+
+    const q = pickRandomFrom(pool);
+
+    // Antwortmöglichkeiten mischen
+    const optionKeys = q.options.map((_, idx) => idx);
+    const shuffledKeys = shuffleArray(optionKeys);
+
+    currentQuestion = { q, shuffledKeys };
+    renderQuestion();
+  }
+
+  function renderQuestion(){
+    const { q, shuffledKeys } = currentQuestion;
+    const qa = el("quizArea");
+
+    const answersHtml = shuffledKeys.map((origIdx) => {
+      const text = q.options[origIdx];
+      return `
+        <label class="answer" style="display:flex; gap:10px; align-items:flex-start;">
+          <input type="checkbox" data-origidx="${origIdx}" style="margin-top:2px;">
+          <span>${escapeHtml(text)}</span>
+        </label>
+      `;
+    }).join("");
+
+    const howMany = Array.isArray(q.correct) ? q.correct.length : 1;
+
+    qa.innerHTML = `
+      <div class="pill">Frage-ID: <strong>${q.id}</strong></div>
+      <div class="question">${escapeHtml(q.text)}</div>
+
+      <div class="small muted">Hinweis: Wähle <strong>${howMany}</strong> Antwort(en).</div>
+
+      <div class="answers">${answersHtml}</div>
+
+      <div class="row" style="margin-top:10px;">
+        <button class="btn primary" id="btnCheck">Antwort prüfen</button>
+      </div>
+
+      <div class="divider"></div>
+      <div class="small muted" id="feedback">Wähle eine oder mehrere Antworten und klicke „Antwort prüfen“.</div>
+    `;
+
+    el("btnCheck").addEventListener("click", handleCheckMulti);
+  }
+
+  function handleCheckMulti(){
+    if(!currentQuestion) return;
+
+    // Button deaktivieren, damit man nicht mehrfach "prüft"
+    const btn = document.getElementById("btnCheck");
+    if(btn) btn.disabled = true;
+
+    const { q } = currentQuestion;
+
+    const checkboxes = [...document.querySelectorAll('#quizArea input[type="checkbox"][data-origidx]')];
+    const picked = checkboxes
+      .filter(cb => cb.checked)
+      .map(cb => Number(cb.getAttribute("data-origidx")))
+      .sort((a,b) => a-b);
+
+    const correct = (q.correct || []).slice().sort((a,b) => a-b);
+
+    const isCorrect =
+      picked.length === correct.length &&
+      picked.every((v,i) => v === correct[i]);
+
+    const oldStage = stageById[q.id];
+    let newStage = oldStage;
+
+    if(isCorrect){
+      if(oldStage === 3) newStage = 2;
+      else if(oldStage === 2) newStage = 1;
+      else newStage = 1;
+    }else{
+      if(oldStage === 1) newStage = 2;
+      else if(oldStage === 2) newStage = 3;
+      else newStage = 3; // bleibt in 3
+    }
+
+    stageById[q.id] = newStage;
+    saveState();
+
+    // UI: sperren + markieren
+    checkboxes.forEach(cb => cb.disabled = true);
+
+    const labels = [...document.querySelectorAll("#quizArea label.answer")];
+    labels.forEach(label => {
+      const cb = label.querySelector("input[type='checkbox']");
+      const idx = Number(cb.getAttribute("data-origidx"));
+
+      const isRight = correct.includes(idx);
+      const wasPicked = cb.checked;
+
+      if(isRight) label.classList.add("good");
+      if(wasPicked && !isRight) label.classList.add("bad");
+    });
+
+    const fb = el("feedback");
+    fb.innerHTML = isCorrect
+      ? `✅ Richtig! Stufe: <strong>${oldStage}</strong> → <strong>${newStage}</strong>`
+      : `❌ Falsch. Stufe: <strong>${oldStage}</strong> → <strong>${newStage}</strong>`;
+
+    renderStatus();
+
+    // erst nach "Nächste Frage" weiter
+    currentQuestion = null;
+  }
+
+  function escapeHtml(s){
+    return String(s)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  // Buttons
+  el("btnStage3").addEventListener("click", () => startStage(3));
+  el("btnStage2").addEventListener("click", () => startStage(2));
+  el("btnStage1").addEventListener("click", () => startStage(1));
+  el("btnNext").addEventListener("click", () => nextQuestion());
+  el("btnReset").addEventListener("click", () => {
+    const ok = confirm("Wirklich alles zurücksetzen? Dann sind alle Fragen wieder in Stufe 3.");
+    if(ok) resetAll();
+  });
+
+  // Init
+  loadState();
+  renderStatus();
+  renderIdle();
+</script>
+</body>
+</html>
